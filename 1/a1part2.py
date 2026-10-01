@@ -70,6 +70,40 @@ def line_newton_alternating(x, y, m0=0.0, b0=0.0, iterations=15):
     return m, b, history
 
 
+# true multivariate newton-raphson: update m and b together using the
+# full gradient and hessian (not one-at-a-time like above). since MSE
+# is quadratic here, the hessian is constant and this converges in 1 step
+
+def line_gradient_hessian(m, b, x, y):
+    s = power_sums(x, y)
+    n, Sx, Sy, Sxx, Sxy = s["n"], s["Sx"], s["Sy"], s["Sxx"], s["Sxy"]
+
+    grad = np.array([
+        -(2 / n) * (Sxy - m * Sxx - b * Sx),
+        -(2 / n) * (Sy - m * Sx - b * n),
+    ])
+    H = (2 / n) * np.array([[Sxx, Sx],
+                             [Sx,  n]])
+    return grad, H
+
+
+def line_newton_multivariate(x, y, m0=0.0, b0=0.0, iterations=10, tolerance=1e-12):
+    theta = np.array([m0, b0], dtype=float)
+    history = [(theta[0], theta[1], mse_line(theta[0], theta[1], x, y))]
+
+    for _ in range(iterations):
+        grad, H = line_gradient_hessian(theta[0], theta[1], x, y)
+        step = np.linalg.solve(H, grad)
+        theta_new = theta - step
+        history.append((theta_new[0], theta_new[1], mse_line(theta_new[0], theta_new[1], x, y)))
+        if np.linalg.norm(theta_new - theta) < tolerance:
+            theta = theta_new
+            break
+        theta = theta_new
+
+    return theta[0], theta[1], history
+
+
 # PART B: PARABOLA FIT  y = a*x^2 + b*x + c
 
 def parabola_analytical(x, y):
@@ -109,6 +143,48 @@ def parabola_newton_alternating(x, y, a0=0.0, b0=0.0, c0=0.0, iterations=25):
         history.append((a, b, c, mse_parabola(a, b, c, x, y)))
 
     return a, b, c, history
+
+
+# true multivariate newton-raphson for the parabola: update a, b, c
+# together using the full gradient and 3x3 hessian
+
+def parabola_gradient_hessian(a, b, c, x, y):
+    s = power_sums(x, y)
+    n = s["n"]
+    Sx, Sxx, Sxxx, Sxxxx = s["Sx"], s["Sxx"], s["Sxxx"], s["Sxxxx"]
+    Sy, Sxy, Sxxy = s["Sy"], s["Sxy"], s["Sxxy"]
+
+    grad = np.array([
+        -(2 / n) * (Sxxy - a * Sxxxx - b * Sxxx - c * Sxx),
+        -(2 / n) * (Sxy - a * Sxxx - b * Sxx - c * Sx),
+        -(2 / n) * (Sy - a * Sxx - b * Sx - c * n),
+    ])
+    H = (2 / n) * np.array([
+        [Sxxxx, Sxxx, Sxx],
+        [Sxxx,  Sxx,  Sx],
+        [Sxx,   Sx,   n],
+    ])
+    return grad, H
+
+
+def parabola_newton_multivariate(x, y, a0=0.0, b0=0.0, c0=0.0,
+                                  iterations=10, tolerance=1e-12):
+    theta = np.array([a0, b0, c0], dtype=float)
+    history = [(theta[0], theta[1], theta[2],
+                mse_parabola(theta[0], theta[1], theta[2], x, y))]
+
+    for _ in range(iterations):
+        grad, H = parabola_gradient_hessian(theta[0], theta[1], theta[2], x, y)
+        step = np.linalg.solve(H, grad)
+        theta_new = theta - step
+        history.append((theta_new[0], theta_new[1], theta_new[2],
+                         mse_parabola(theta_new[0], theta_new[1], theta_new[2], x, y)))
+        if np.linalg.norm(theta_new - theta) < tolerance:
+            theta = theta_new
+            break
+        theta = theta_new
+
+    return theta[0], theta[1], theta[2], history
 
 
 # PLOTS
@@ -158,6 +234,39 @@ def plot_convergence(line_history, parabola_history):
 
     plt.tight_layout()
     plt.savefig("plot_part2_convergence.png", dpi=120)
+    plt.show()
+
+
+def plot_method_comparison(line_hist_alt, line_hist_mv, parab_hist_alt, parab_hist_mv):
+    # compares the alternating (one-parameter-at-a-time) method against
+    # true multivariate newton-raphson (gradient + hessian together).
+    # the multivariate version should hit the minimum in 1 step since
+    # MSE is quadratic, vs. the gradual descent of the alternating scheme
+    line_mse_alt = [h[2] for h in line_hist_alt]
+    line_mse_mv = [h[2] for h in line_hist_mv]
+    parab_mse_alt = [h[3] for h in parab_hist_alt]
+    parab_mse_mv = [h[3] for h in parab_hist_mv]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+
+    axes[0].plot(range(len(line_mse_alt)), line_mse_alt, "o-", color="green", label="Alternating")
+    axes[0].plot(range(len(line_mse_mv)), line_mse_mv, "s-", color="darkred", label="Multivariate (grad+Hessian)")
+    axes[0].set_xlabel("Iteration")
+    axes[0].set_ylabel("MSE")
+    axes[0].set_title("Line fit: alternating vs. multivariate")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].plot(range(len(parab_mse_alt)), parab_mse_alt, "o-", color="blue", label="Alternating")
+    axes[1].plot(range(len(parab_mse_mv)), parab_mse_mv, "s-", color="darkred", label="Multivariate (grad+Hessian)")
+    axes[1].set_xlabel("Iteration")
+    axes[1].set_ylabel("MSE")
+    axes[1].set_title("Parabola fit: alternating vs. multivariate")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig("plot_part2_method_comparison.png", dpi=120)
     plt.show()
 
 
@@ -242,6 +351,17 @@ if __name__ == "__main__":
     for i, (m_i, b_i, mse_i) in enumerate(line_history):
         print(f"  iter {i}: m={m_i:.6f}, b={b_i:.6f}, MSE={mse_i:.6f}")
 
+    # true multivariate newton-raphson (gradient + hessian together, not
+    # one-at-a-time) -- MSE is quadratic in (m,b) so this should converge
+    # in exactly 1 step
+    m_mv, b_mv, line_history_mv = line_newton_multivariate(x_data, y_data)
+    print(f"\nNewton-Raphson (multivariate, gradient + hessian):")
+    print(f"  m = {m_mv:.6f}, b = {b_mv:.6f}")
+    print(f"  MSE = {mse_line(m_mv, b_mv, x_data, y_data):.6f}")
+    print(f"  steps taken = {len(line_history_mv) - 1}")
+    print(f"  |m_analytical - m_mv| = {abs(m_analytical - m_mv):.2e}")
+    print(f"  |b_analytical - b_mv| = {abs(b_analytical - b_mv):.2e}")
+
     # parabola fit
     print("\n" + "=" * 60)
     print("PARABOLA FIT  y = a*x^2 + b*x + c")
@@ -264,6 +384,17 @@ if __name__ == "__main__":
     for i, (a_i, b_i, c_i, mse_i) in enumerate(parab_history[:10]):
         print(f"  iter {i}: a={a_i:.6f}, b={b_i:.6f}, c={c_i:.6f}, MSE={mse_i:.6f}")
 
+    # true multivariate newton-raphson for the parabola -- 3x3 hessian,
+    # should also converge in exactly 1 step
+    a_mv, b2_mv, c_mv, parab_history_mv = parabola_newton_multivariate(x_data, y_data)
+    print(f"\nNewton-Raphson (multivariate, gradient + hessian):")
+    print(f"  a = {a_mv:.6f}, b = {b2_mv:.6f}, c = {c_mv:.6f}")
+    print(f"  MSE = {mse_parabola(a_mv, b2_mv, c_mv, x_data, y_data):.6f}")
+    print(f"  steps taken = {len(parab_history_mv) - 1}")
+    print(f"  |a_analytical - a_mv| = {abs(a_analytical - a_mv):.2e}")
+    print(f"  |b_analytical - b_mv| = {abs(b2_analytical - b2_mv):.2e}")
+    print(f"  |c_analytical - c_mv| = {abs(c_analytical - c_mv):.2e}")
+
     # plots
     plot_fit(x_data, y_data,
              (m_analytical, b_analytical),
@@ -271,6 +402,7 @@ if __name__ == "__main__":
              title="Part 2: Least-Squares Line and Parabola Fits")
 
     plot_convergence(line_history, parab_history)
+    plot_method_comparison(line_history, line_history_mv, parab_history, parab_history_mv)
     plot_parameter_trajectory_line(line_history)
 
     # fit-progression plots

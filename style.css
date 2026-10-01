@@ -86,3 +86,29 @@ code { font-family: Consolas, Monaco, monospace; }
   .gallery { grid-template-columns: 1fr; }
   embed.pdf { height: 500px; }
 }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 14px;
+}
+
+th, td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  background: #f4f4f4;
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background: #fafafa;
+}
+
+td:first-child {
+  text-align: left;
+}

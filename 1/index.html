@@ -5,98 +5,388 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SYDE 572 - Assignment 1</title>
 <link rel="stylesheet" href="../style.css">
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
 </head>
 <body>
 
 <h1>SYDE 572 - Assignment 1</h1>
-<p>Distance from a point to a curve, and fitting a curve to points - handwritten solutions, code, and plots.</p>
+<p>Distance from a point to a curve, and fitting a curve to points. Each part is solved three ways - analytically, by hand with an iterative numerical method, and in Python - with full derivations, code, and results below.</p>
 
 <nav>
-  <a href="../index.html">← All assignments</a>
+  <a href="../index.html">&larr; All assignments</a>
   <a href="#part1">Part 1</a>
   <a href="#part2">Part 2</a>
-  <a href="https://github.com/victoriachakma/VC572.github.io">GitHub repo</a>
+  <a href="https://github.com/victoriachakma/VC572" target="_blank" rel="noopener noreferrer">GitHub repo &#8599;</a>
 </nav>
 
 <!-- ================= PART 1 ================= -->
 <h2 id="part1">Part 1 - Distance from a point to a curve</h2>
-<p>Function: y = x² + 5. Points: (0,0), (−4,0), (−8,0), (2,0), (6,0).</p>
+<p>Function: y = x² + 5 (plus a second parabola and four non-polynomial functions, used to demonstrate generality). Points for the given parabola: (0,0), (−4,0), (−8,0), (2,0), (6,0).</p>
+
+<p>
+  Finding the closest point on a curve to a fixed point (x₀, y₀) is an optimization problem: minimize the squared distance
+  $$D(x) = (x-x_0)^2 + (f(x)-y_0)^2$$
+  over every candidate point (x, f(x)) on the curve. The square avoids a difficult square root in the derivative without
+  changing where the minimum sits, since square-rooting is a monotonically increasing operation - whatever x value minimizes D(x)
+  also minimizes the true distance.
+</p>
+
+<h3>Analytical approach</h3>
+<p>
+  Setting D'(x) = 0 gives the critical-point condition
+  $$D'(x) = 2(x-x_0) + 2(f(x)-y_0)f'(x) = 0$$
+  Geometrically, this says the vector from the fixed point to the curve must be perpendicular to the curve's tangent line
+  at that point - the shortest path from a point to a curve always meets the curve at a right angle. For most of the
+  points tested here this condition reduces to a cubic in x with no clean closed form, so it is solved numerically by
+  substitution in the handwritten work, then verified against both numerical methods below.
+</p>
 
 <h3>Handwritten solution</h3>
 <embed class="pdf" src="media/part1_hand.pdf" type="application/pdf">
-<p class="pdf-fallback">If the PDF doesn't display, <a href="media/part1_hand.pdf">open it directly</a>.</p>
+<p class="pdf-fallback">
+  If the PDF doesn't display inline,
+  <a href="https://github.com/victoriachakma/VC572/blob/main/1/media/part1_hand.pdf" target="_blank" rel="noopener noreferrer">view it on GitHub</a>.
+</p>
+
+<h3>Numerical approaches</h3>
+<p>
+  <strong>Newton-Raphson</strong> applies Newton's root-finding method to D'(x) = 0 (not to D(x) directly - Newton's method
+  finds roots, and the root of D'(x) is the critical point of D(x)):
+  $$x_{n+1} = x_n - \frac{D'(x_n)}{D''(x_n)}$$
+  When the exact derivative f'(x) is available (the two parabolas here), it is passed in directly; for the non-polynomial
+  cases (exponential, log, rational, radical) the code falls back to a central-difference numerical derivative,
+  $f'(x) \approx \frac{f(x+h)-f(x-h)}{2h}$, since those weren't required to be differentiated by hand.
+</p>
+<p>
+  <strong>Golden Section Search</strong> needs no derivatives. It reduces a bracket [a, b] by comparing the squared
+  distance at two interior points placed using the golden-ratio split (resphi ≈ 0.381966), discarding whichever side of
+  the interval can't contain the minimum. This split ratio is specifically what lets the algorithm reuse one interior
+  point from the previous iteration instead of recomputing both from scratch each round - that reuse is the entire reason
+  the golden ratio is used instead of, say, plain bisection.
+</p>
 
 <h3>Code</h3>
-<p>Full file: <a href="a1part1.py">a1part1.py</a></p>
+<p>
+  Full file:
+  <a href="https://github.com/victoriachakma/VC572/blob/main/1/a1part1.py" target="_blank" rel="noopener noreferrer">a1part1.py on GitHub &#8599;</a>
+</p>
+
+<p><strong>Method 1 - Newton-Raphson</strong> (uses the exact derivative when supplied, otherwise falls back to a numerical one):</p>
 <pre><code>def newton_raphson(px, py, f, x0, df=None, ddf=None,
                     tolerance=1e-10, max_iterations=100):
-    fprime  = df  if df  is not None else lambda x: numerical_derivative(f, x)
-    fdprime = ddf if ddf is not None else lambda x: numerical_second_derivative(f, x)
+    fprime = df if df is not None else (lambda x: numerical_derivative(f, x))
+    fdprime = ddf if ddf is not None else (lambda x: numerical_second_derivative(f, x))
+
     x = x0
     history = [x]
     for i in range(max_iterations):
-        g_prime = 2*(x - px) + 2*(f(x) - py)*fprime(x)
-        g_double_prime = 2 + 2*fprime(x)**2 + 2*(f(x) - py)*fdprime(x)
+        g_prime = 2 * (x - px) + 2 * (f(x) - py) * fprime(x)
+        g_double_prime = 2 + 2 * fprime(x)**2 + 2 * (f(x) - py) * fdprime(x)
+
         if abs(g_double_prime) < 1e-14:
             break
+
         x_new = x - g_prime / g_double_prime
         history.append(x_new)
+
         if abs(x_new - x) < tolerance:
             x = x_new
             break
+
         x = x_new
+
     return x, distance(x, px, py, f), history</code></pre>
 
-<h3>Plots</h3>
+<p><strong>Method 2 - Golden Section Search</strong> (no derivatives, shrinks a bracket using the golden ratio):</p>
+<pre><code>def golden_section_search(px, py, f, a, b,
+                           tolerance=1e-10,
+                           max_iterations=1000):
+
+    g = lambda x: squared_distance(x, px, py, f)
+
+    golden_ratio = (np.sqrt(5) - 1) / 2  # == 1 - 1/phi == 2 - phi
+
+    c = b - golden_ratio * (b - a)
+    d = a + golden_ratio * (b - a)
+
+    history = [c, d]
+    iterations = 0
+
+    for i in range(max_iterations):
+        iterations += 1
+
+        if g(c) < g(d):
+            b = d
+            d = c
+            c = b - golden_ratio * (b - a)
+        else:
+            a = c
+            c = d
+            d = a + golden_ratio * (b - a)
+
+        history.extend([c, d])
+
+        if abs(b - a) < tolerance:
+            break
+
+    x_min = (a + b) / 2
+
+    return x_min, distance(x_min, px, py, f), history, iterations</code></pre>
+
+<h3>Results summary</h3>
+<p>
+  Both methods operate to a tolerance of 1e-10. Newton-Raphson's iteration count varies with how far the starting guess
+  is from the answer and whether an exact or numerical derivative is used; Golden Section Search's count is driven
+  primarily by how large the starting bracket is, which is why it needs approx. 55 iterations in every case here regardless
+  of the function.
+</p>
+<table>
+  <tr>
+    <th>Function</th>
+    <th>Point</th>
+    <th>Newton x*</th>
+    <th>Newton distance</th>
+    <th>Newton iters</th>
+    <th>Golden x*</th>
+    <th>Golden iters</th>
+    <th>|Newton − Golden| (x)</th>
+  </tr>
+
+  <tr><td>y = x² + 5</td><td>(0, 0)</td><td>0.000000</td><td>5.000000</td><td>1</td><td>0.000000</td><td>55</td><td>2.1e-08</td></tr>
+  <tr><td>y = x² + 5</td><td>(−4, 0)</td><td>−0.355470</td><td>6.289845</td><td>8</td><td>−0.355470</td><td>55</td><td>6.7e-09</td></tr>
+  <tr><td>y = x² + 5</td><td>(−8, 0)</td><td>−0.672078</td><td>9.133420</td><td>9</td><td>−0.672078</td><td>55</td><td>2.1e-08</td></tr>
+  <tr><td>y = x² + 5</td><td>(2, 0)</td><td>0.180745</td><td>5.351396</td><td>6</td><td>0.180745</td><td>55</td><td>1.3e-08</td></tr>
+  <tr><td>y = x² + 5</td><td>(6, 0)</td><td>0.519904</td><td>7.603125</td><td>8</td><td>0.519904</td><td>55</td><td>7.5e-09</td></tr>
+
+  <tr><td>y = x² − 3x + 2</td><td>(0, 0)</td><td>0.682817</td><td>0.800491</td><td>6</td><td>0.682817</td><td>55</td><td>4.9e-09</td></tr>
+  <tr><td>y = x² − 3x + 2</td><td>(5, 4)</td><td>3.637459</td><td>1.399324</td><td>7</td><td>3.637459</td><td>55</td><td>4.3e-09</td></tr>
+  <tr><td>y = x² − 3x + 2</td><td>(−3, 2)</td><td>−0.243669</td><td>2.867414</td><td>8</td><td>−0.243669</td><td>55</td><td>2.5e-09</td></tr>
+
+  <tr><td>y = e^(0.4x)</td><td>(2, 0)</td><td>1.063438</td><td>1.794032</td><td>4</td><td>1.063438</td><td>53</td><td>9.7e-09</td></tr>
+  <tr><td>y = ln(x+6)</td><td>(−2, 1)</td><td>−2.092857</td><td>0.374501</td><td>4</td><td>−2.092857</td><td>54</td><td>1.0e-11</td></tr>
+  <tr><td>y = 1/(x+3)</td><td>(1, 1)</td><td>0.952177</td><td>0.748504</td><td>4</td><td>0.952177</td><td>53</td><td>2.3e-09</td></tr>
+  <tr><td>y = √(x+4)</td><td>(2, 3)</td><td>2.106985</td><td>0.539483</td><td>4</td><td>2.106985</td><td>54</td><td>6.1e-09</td></tr>
+</table>
+<p>Every case agrees between the two methods to at least 8 significant figures, confirming both implementations converge to the same minimum.</p>
+
+<h3>All plots</h3>
+<p>Each plot shows the function, the fixed point, every intermediate step both searches took (green = Newton-Raphson, orange = Golden Section Search), and the final closest point with the shortest-distance segment drawn in.</p>
+
+<p><em>y = x² + 5 - all 5 points</em></p>
 <div class="gallery">
-  <figure>
-    <img src="media/plot_y_=_x2_+_5_Point_-4_0.png" alt="Convergence plot for (-4,0) on y=x^2+5">
-    <figcaption>y = x² + 5, point (−4, 0)</figcaption>
-  </figure>
-  <figure>
-    <img src="media/plot_y_=_exp0.4x_Point_2_0.png" alt="Convergence plot for exponential function">
-    <figcaption>y = e^(0.4x), point (2, 0) - non-polynomial case</figcaption>
-  </figure>
+  <figure><img src="media/plot_y_=_x2_+_5_Point_0_0.png" alt="Point (0,0) on y=x^2+5"><figcaption>Point (0, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_+_5_Point_-4_0.png" alt="Point (-4,0) on y=x^2+5"><figcaption>Point (−4, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_+_5_Point_-8_0.png" alt="Point (-8,0) on y=x^2+5"><figcaption>Point (−8, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_+_5_Point_2_0.png" alt="Point (2,0) on y=x^2+5"><figcaption>Point (2, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_+_5_Point_6_0.png" alt="Point (6,0) on y=x^2+5"><figcaption>Point (6, 0)</figcaption></figure>
 </div>
-<p><em>Remaining points and functions (second parabola, log, rational, radical) generated by the same script - see the repo.</em></p>
+
+<p><em>y = x² − 3x + 2 - second parabola, all 3 points</em></p>
+<div class="gallery">
+  <figure><img src="media/plot_y_=_x2_-_3x_+_2_Point_0_0.png" alt="Point (0,0) on y=x^2-3x+2"><figcaption>Point (0, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_-_3x_+_2_Point_5_4.png" alt="Point (5,4) on y=x^2-3x+2"><figcaption>Point (5, 4)</figcaption></figure>
+  <figure><img src="media/plot_y_=_x2_-_3x_+_2_Point_-3_2.png" alt="Point (-3,2) on y=x^2-3x+2"><figcaption>Point (−3, 2)</figcaption></figure>
+</div>
+
+<p><em>Non-polynomial functions - one point each</em></p>
+<div class="gallery">
+  <figure><img src="media/plot_y_=_exp0.4x_Point_2_0.png" alt="Exponential function example"><figcaption>y = e^(0.4x), point (2, 0)</figcaption></figure>
+  <figure><img src="media/plot_y_=_lnx_+_6_Point_-2_1.png" alt="Logarithmic function example"><figcaption>y = ln(x+6), point (−2, 1)</figcaption></figure>
+  <figure><img src="media/plot_y_=_1_-_x_+_3_Point_1_1.png" alt="Rational function example"><figcaption>y = 1/(x+3), point (1, 1) - variable in denominator</figcaption></figure>
+  <figure><img src="media/plot_y_=_sqrtx_+_4_Point_2_3.png" alt="Radical function example"><figcaption>y = √(x+4), point (2, 3) - radical/root function</figcaption></figure>
+</div>
 
 <!-- ================= PART 2 ================= -->
 <h2 id="part2">Part 2 - Fitting a line and a parabola</h2>
-<p>Points: (0, 0.5), (1, 1.5), (2, 3.5), (3, 7.5).</p>
+<p>Points: (0, 0.5), (1, 1.5), (2, 3.5), (3, 7.5). Fitting y = mx + b and y = ax² + bx + c by minimizing mean squared error.</p>
+
+<h3>Setup - the MSE objective</h3>
+<p>
+  $$\text{MSE} = \frac{1}{n}\sum_{i=1}^n (y_i - \hat{y}_i)^2$$
+  Substituting the data directly:
+  $$\text{MSE}(m,b) = \tfrac14\left[(0.5-b)^2+(3.5-(2m+b))^2+(1.5-(m+b))^2+(7.5-(3m+b))^2\right]$$
+  $$\text{MSE}(a,b,c) = \tfrac14\left[(0.5-c)^2+(3.5-(4a+2b+c))^2+(1.5-(a+b+c))^2+(7.5-(9a+3b+c))^2\right]$$
+  All three solution methods below (analytical, alternating Newton-Raphson, and true multivariate Newton-Raphson) use the
+  same precomputed power sums, since they all fall directly out of differentiating this same objective:
+  Σx=6, Σy=13, Σx²=14, Σxy=31, Σx³=36, Σx⁴=98, Σx²y=83, n=4.
+</p>
 
 <h3>Handwritten solution</h3>
 <embed class="pdf" src="media/part2_hand.pdf" type="application/pdf">
-<p class="pdf-fallback">If the PDF doesn't display, <a href="media/part2_hand.pdf">open it directly</a>.</p>
+<p class="pdf-fallback">
+  If the PDF doesn't display inline,
+  <a href="https://github.com/victoriachakma/VC572/blob/main/1/media/part2_hand.pdf" target="_blank" rel="noopener noreferrer">view it on GitHub</a>.
+</p>
+
+<h3>Analytical solution</h3>
+<p>
+  Setting every partial derivative to zero gives the normal equations, solved directly as a linear system using the sums
+  above. This gives the exact least-squares answer with no iteration: m = 2.3, b = −0.2 for the line, and
+  a = 0.75, b = 0.05, c = 0.55 for the parabola.
+</p>
+
+<h3>Numerical solution 1 - alternating Newton-Raphson</h3>
+<p>
+  This method fixes all but one parameter, solves exactly for the remaining one, then cycles to the next parameter and
+  repeats. Each individual step is exact given the other parameter(s) are held fixed, but because the parameters are
+  coupled in the full objective, several cycles are needed before the whole system settles - the line (2 parameters)
+  converges in well under 15 iterations, while the parabola (3 parameters) needs closer to 25, since there is more
+  coupling between three parameters than two.
+</p>
+
+<h3>Numerical solution 2 - true multivariate Newton-Raphson</h3>
+<p>
+  This is the method the assignment specifies: rather than updating one parameter at a time, all parameters are
+  updated together using the full gradient vector and the full Hessian matrix of second partial derivatives (including
+  the cross terms, e.g. ∂²MSE/∂m∂b):
+  $$\theta_{n+1} = \theta_n - H^{-1}\nabla\text{MSE}(\theta_n)$$
+  As MSE is a quadratic function of the parameters for both fits here, the Hessian is constant (it doesn't depend on
+  θ at all) - which means this method converges in exactly one step from any starting point, landing on exactly the
+  same answer as the analytical solve. This isn't a coincidence: solving $H\theta_1 = -\nabla\text{MSE}(\theta_0)$ is
+  algebraically the same linear system as the normal equations, so for a quadratic objective, Newton's method and the
+  closed-form least-squares solve are the same computation performed in two different ways.
+</p>
 
 <h3>Code</h3>
-<p>Full file: <a href="a1part2.py">a1part2.py</a></p>
+<p>
+  Full file:
+  <a href="https://github.com/victoriachakma/VC572/blob/main/1/a1part2.py" target="_blank" rel="noopener noreferrer">a1part2.py on GitHub &#8599;</a>
+</p>
+
+<p><strong>Alternating Newton-Raphson</strong> (one parameter at a time, parabola case shown):</p>
 <pre><code>def parabola_newton_alternating(x, y, a0=0.0, b0=0.0, c0=0.0, iterations=25):
     s = power_sums(x, y)
     n = s["n"]
     Sx, Sxx, Sxxx, Sxxxx = s["Sx"], s["Sxx"], s["Sxxx"], s["Sxxxx"]
     Sy, Sxy, Sxxy = s["Sy"], s["Sxy"], s["Sxxy"]
+
     a, b, c = a0, b0, c0
     history = [(a, b, c, mse_parabola(a, b, c, x, y))]
+
     for _ in range(iterations):
-        a = (Sxxy - b*Sxxx - c*Sxx) / Sxxxx
-        b = (Sxy  - a*Sxxx - c*Sx)  / Sxx
-        c = (Sy   - a*Sxx  - b*Sx)  / n
+        a = (Sxxy - b * Sxxx - c * Sxx) / Sxxxx
+        b = (Sxy - a * Sxxx - c * Sx) / Sxx
+        c = (Sy - a * Sxx - b * Sx) / n
         history.append((a, b, c, mse_parabola(a, b, c, x, y)))
+
     return a, b, c, history</code></pre>
 
-<h3>Plots</h3>
-<div class="gallery">
-  <figure>
-    <img src="media/plot_part2_fits.png" alt="Line and parabola fits over the data">
-    <figcaption>Both fits over the data</figcaption>
-  </figure>
-  <figure>
-    <img src="media/plot_part2_convergence.png" alt="MSE convergence for both fits">
-    <figcaption>MSE vs. iteration</figcaption>
-  </figure>
-</div>
+<p><strong>True multivariate Newton-Raphson</strong> (gradient + Hessian together, parabola case shown):</p>
+<pre><code>def parabola_gradient_hessian(a, b, c, x, y):
+    s = power_sums(x, y)
+    n = s["n"]
+    Sx, Sxx, Sxxx, Sxxxx = s["Sx"], s["Sxx"], s["Sxxx"], s["Sxxxx"]
+    Sy, Sxy, Sxxy = s["Sy"], s["Sxy"], s["Sxxy"]
 
-<p><a href="all-plots.html">See every plot generated by the code →</a></p>
+    grad = np.array([
+        -(2 / n) * (Sxxy - a * Sxxxx - b * Sxxx - c * Sxx),
+        -(2 / n) * (Sxy - a * Sxxx - b * Sxx - c * Sx),
+        -(2 / n) * (Sy - a * Sxx - b * Sx - c * n),
+    ])
+    H = (2 / n) * np.array([
+        [Sxxxx, Sxxx, Sxx],
+        [Sxxx,  Sxx,  Sx],
+        [Sxx,   Sx,   n],
+    ])
+    return grad, H
+
+
+def parabola_newton_multivariate(x, y, a0=0.0, b0=0.0, c0=0.0,
+                                  iterations=10, tolerance=1e-12):
+    theta = np.array([a0, b0, c0], dtype=float)
+    history = [(theta[0], theta[1], theta[2],
+                mse_parabola(theta[0], theta[1], theta[2], x, y))]
+
+    for _ in range(iterations):
+        grad, H = parabola_gradient_hessian(theta[0], theta[1], theta[2], x, y)
+        step = np.linalg.solve(H, grad)
+        theta_new = theta - step
+        history.append((theta_new[0], theta_new[1], theta_new[2],
+                         mse_parabola(theta_new[0], theta_new[1], theta_new[2], x, y)))
+        if np.linalg.norm(theta_new - theta) < tolerance:
+            theta = theta_new
+            break
+        theta = theta_new
+
+    return theta[0], theta[1], theta[2], history</code></pre>
+
+<h3>Results summary</h3>
+<table>
+  <tr>
+    <th>Fit</th>
+    <th>Method</th>
+    <th>Final parameters</th>
+    <th>MSE</th>
+    <th>Iterations / steps</th>
+    <th>Max error vs. analytical</th>
+  </tr>
+  <tr>
+    <td rowspan="3">Line (y = mx + b)</td>
+    <td>Analytical</td>
+    <td>m = 2.300000, b = −0.200000</td>
+    <td>0.575000</td>
+    <td>— (closed form)</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td>Alternating Newton-Raphson</td>
+    <td>m = 2.299824, b = −0.199735</td>
+    <td>0.575000</td>
+    <td>15</td>
+    <td>2.65e-04</td>
+  </tr>
+  <tr>
+    <td>Multivariate Newton-Raphson</td>
+    <td>m = 2.300000, b = −0.200000</td>
+    <td>0.575000</td>
+    <td>1 (+1 to confirm)</td>
+    <td>1.05e-15</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Parabola (y = ax² + bx + c)</td>
+    <td>Analytical</td>
+    <td>a = 0.750000, b = 0.050000, c = 0.550000</td>
+    <td>0.012500</td>
+    <td>— (closed form)</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td>Alternating Newton-Raphson</td>
+    <td>a = 0.744761, b = 0.065953, c = 0.544407</td>
+    <td>0.012528</td>
+    <td>25</td>
+    <td>1.60e-02</td>
+  </tr>
+  <tr>
+    <td>Multivariate Newton-Raphson</td>
+    <td>a = 0.750000, b = 0.050000, c = 0.550000</td>
+    <td>0.012500</td>
+    <td>1 (+1 to confirm)</td>
+    <td>7.42e-15</td>
+  </tr>
+</table>
+<p>
+  The multivariate method's "1 (+1 to confirm)" reflects that the single real update already lands on the exact answer;
+  a second pass computes an essentially-zero step and triggers the tolerance-based stopping condition. The alternating
+  method is still converging toward the same answer after 15-25 cycles rather than reaching it exactly, which is the
+  expected behaviour for a method that only ever has partial information (one parameter's optimum conditioned on the
+  others being temporarily frozen) at each separate step.
+</p>
+
+<h3>All plots</h3>
+<div class="gallery">
+  <figure><img src="media/plot_part2_fits.png" alt="Line and parabola fits over the data"><figcaption>Both fits over the data</figcaption></figure>
+  <figure><img src="media/plot_part2_convergence.png" alt="MSE convergence for both fits, alternating method"><figcaption>MSE vs. iteration, alternating method</figcaption></figure>
+  <figure><img src="media/plot_part2_method_comparison.png" alt="Alternating vs multivariate convergence comparison"><figcaption>Alternating vs. multivariate convergence</figcaption></figure>
+  <figure><img src="media/plot_part2_line_trajectory.png" alt="Line fit (m,b) parameter trajectory"><figcaption>Line fit: (m, b) trajectory across iterations</figcaption></figure>
+  <figure><img src="media/plot_Part_2_Line_fit_progression.png" alt="Line fit progression over iterations"><figcaption>Line fit progression (curve tightening onto the data)</figcaption></figure>
+  <figure><img src="media/plot_Part_2_Parabola_fit_progression.png" alt="Parabola fit progression over iterations"><figcaption>Parabola fit progression (curve tightening onto the data)</figcaption></figure>
+</div>
 
 </body>
 </html>
