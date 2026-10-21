@@ -12,6 +12,11 @@ FEATURE_NAMES = ["CRIM", "ZN", "INDUS", "CHAS", "NOX", "RM", "AGE",
 # helper functions
 
 def load_boston_data():
+    # use the course-provided housing.data (next to this script) if it's there
+    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), "housing.data")
+    if os.path.exists(local):
+        data = np.loadtxt(local)
+        return data[:, :-1], data[:, -1]   # 13 features, MEDV target
     try:
         data_url = "https://lib.stat.cmu.edu/datasets/boston"
         raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
