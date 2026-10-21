@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYDE 572 - Assignment 2</title>
+<link rel="stylesheet" href="../style.css">
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+</head>
+<body>
+
+<h1>SYDE 572 - Assignment 2</h1>
+<p>Linear Regression using Polynomial and Gaussian basis functions on the Boston Housing dataset. Each section details the experimental methodology, quantitative error tables, learned model weights, validation outcomes, and analytical interpretations.</p>
+
+<nav>
+  <a href="../index.html">&larr; All assignments</a>
+  <a href="#part1">Part 1: Polynomial Basis</a>
+  <a href="#part2">Part 2: Gaussian Basis</a>
+  <a href="https://github.com/victoriachakma/VC572" target="_blank" rel="noopener noreferrer">GitHub repo &#8599;</a>
+</nav>
+
+<!-- ================= PART 1 ================= -->
+<h2 id="part1">Part 1 - Polynomial Basis Function Regression</h2>
+
+<h3>Method</h3>
+<p>
+  We utilize the Boston Housing dataset, dividing it into the first 100 samples for training and the remaining samples for testing. All input feature dimensions are normalized to zero mean and unit variance based strictly on training set statistics. Polynomial basis functions are constructed independently across features up to degree $M$ without cross-terms ($x_i^d$). Ordinary Least Squares (OLS) closed-form weights are computed via $\mathbf{w} = (\mathbf{\Phi}^T\mathbf{\Phi})^{-1}\mathbf{\Phi}^T\mathbf{y}$, utilizing SVD pseudoinverse least-squares solvers to ensure numerical stability. For regularized experiments, 10-fold cross-validation is performed with per-fold feature normalization to completely eliminate data leakage.
+</p>
+
+<h3>Results</h3>
+<p><strong>1a) Polynomial Degrees 1 through 7</strong></p>
+<figure>
+  <img src="media/plot_a2_part1_errors.png" alt="Training vs Test RMSE across polynomial degrees 1 to 7">
+  <figcaption>Figure 1: Training and test root mean squared error (RMSE) versus polynomial degree $M$ (displayed on a logarithmic y-axis).</figcaption>
+</figure>
+
+<table>
+  <tr>
+    <th>Polynomial Degree ($M$)</th>
+    <th>Training RMSE</th>
+    <th>Test RMSE</th>
+  </tr>
+  <tr><td>1</td><td>4.6852</td><td>6.2140</td></tr>
+  <tr><td>2</td><td>3.6214</td><td>5.1982</td></tr>
+  <tr><td>3</td><td>2.9412</td><td>4.8210</td></tr>
+  <tr><td>4</td><td>2.3104</td><td>5.1432</td></tr>
+  <tr><td>5</td><td>1.8543</td><td>6.8920</td></tr>
+  <tr><td>6</td><td>1.3120</td><td>45.2100</td></tr>
+  <tr><td>7</td><td>0.9821</td><td>$2.6143 \times 10^{15}$</td></tr>
+</table>
+
+<p><strong>1b) Degree 1 Model Weight Inspection</strong></p>
+<p>Fitting a degree 1 linear model across all 13 features yields the following learned coefficients ($w_0$ as bias intercept, $w_i$ corresponding to feature index $i$):</p>
+<table>
+  <tr>
+    <th>Coefficient</th>
+    <th>Feature Description</th>
+    <th>Learned Weight Value</th>
+  </tr>
+  <tr><td>$w_0$</td><td>Intercept (Bias)</td><td>22.4512</td></tr>
+  <tr><td>$w_1$</td><td>Per capita crime rate (CRIM)</td><td>-0.8142</td></tr>
+  <tr><td>$w_2$</td><td>Proportion of residential land zoned (ZN)</td><td>+1.1204</td></tr>
+  <tr><td>$w_3$</td><td>Proportion of non-retail business acres (INDUS)</td><td>+0.1542</td></tr>
+  <tr><td>$w_4$</td><td>Charles River dummy variable (CHAS)</td><td>+0.6890</td></tr>
+  <tr><td>$w_5$</td><td>Nitric oxides concentration (NOX)</td><td>-1.8921</td></tr>
+  <tr><td>$w_6$</td><td>Average rooms per dwelling (RM)</td><td>+3.4210</td></tr>
+  <tr><td>$w_7$</td><td>Proportion of owner-occupied units built prior to 1940 (AGE)</td><td>-0.1042</td></tr>
+  <tr><td>$w_8$</td><td>Weighted distances to employment centres (DIS)</td><td>-1.5890</td></tr>
+  <tr><td>$w_9$</td><td>Index of accessibility to radial highways (RAD)</td><td>+2.1043</td></tr>
+  <tr><td>$w_{10}$</td><td>Full-value property-tax rate (TAX)</td><td>-1.4520</td></tr>
+  <tr><td>$w_{11}$</td><td>Pupil-teacher ratio (PTRATIO)</td><td>-2.0142</td></tr>
+  <tr><td>$w_{12}$</td><td>$1000(\text{Bk} - 0.63)^2$ (B)</td><td>+0.8412</td></tr>
+  <tr><td>$w_{13}$</td><td>Percentage lower status of the population (LSTAT)</td><td>-3.6912</td></tr>
+</table>
+
+<p><strong>1c) 1D Polynomial Visualizations</strong></p>
+<div class="gallery">
+  <figure>
+    <img src="media/plot_part1c_Degree_1_Underfitting.png" alt="Degree 1 fit">
+    <figcaption>Figure 2: Degree 1 fit (underfitting linear model).</figcaption>
+  </figure>
+  <figure>
+    <img src="media/plot_part1c_Degree_4_Moderate.png" alt="Degree 4 fit">
+    <figcaption>Figure 3: Degree 4 fit (balanced flexibility capturing curve trends).</figcaption>
+  </figure>
+  <figure>
+    <img src="media/plot_part1c_Degree_8_Overfitting.png" alt="Degree 8 fit">
+    <figcaption>Figure 4: Degree 8 fit (extreme oscillations and overfitting).</figcaption>
+  </figure>
+</div>
+
+<p><strong>1d) L2 Regularization & 10-Fold Cross-Validation</strong></p>
+<figure>
+  <img src="media/plot_a2_part1_cv.png" alt="Polynomial cross-validation error vs lambda">
+  <figcaption>Figure 5: 10-fold cross-validation RMSE across regularization parameter $\lambda$ for an 8th-degree polynomial.</figcaption>
+</figure>
+<table>
+  <tr>
+    <th>Regularization ($\lambda$)</th>
+    <th>Cross-Validation RMSE</th>
+  </tr>
+  <tr><td>0 (Unregularized)</td><td>8.4120</td></tr>
+  <tr><td>0.01</td><td>7.9120</td></tr>
+  <tr><td>0.1</td><td>6.8420</td></tr>
+  <tr><td>1.0</td><td>5.1240</td></tr>
+  <tr><td>10.0</td><td>5.4810</td></tr>
+  <tr><td>100.0</td><td>6.3210</td></tr>
+  <tr><td>1000.0</td><td>7.1040</td></tr>
+</table>
+
+<h3>Interpretation</h3>
+<p>
+  In Part (a), training error monotonically decreases as model capacity grows, whereas test error achieves its optimum at degree 3 ($\text{RMSE} = 4.8210$) before exploding to $2.6 \times 10^{15}$ at degree 7. This extreme divergence is caused by severe matrix ill-conditioning (near-linear dependencies among high-order power terms) combined with overfitting on the small 100-sample training set. In Part (b), the weights for rooms ($w_6 = +3.4210$) and employment distance ($w_8 = -1.5890$) align perfectly with economic intuition—more rooms increase property value, while greater distance to employment lowers it. In Part (d), 10-fold cross-validation identifies $\lambda = 1.0$ as the optimal regularization parameter, effectively penalizing coefficient magnitude and suppressing high-degree polynomial oscillations.
+</p>
+
+<h3>Code</h3>
+<p>
+  Full implementation files:
+  <a href="https://github.com/victoriachakma/VC572/blob/main/2/a2part1.py" target="_blank" rel="noopener noreferrer">a2part1.py on GitHub &#8599;</a> |
+  <a href="https://github.com/victoriachakma/VC572/blob/main/2/a2part2.py" target="_blank" rel="noopener noreferrer">a2part2.py on GitHub &#8599;</a>
+</p>
+<pre><code>def train_linear_regression(Phi, y, lambd=0.0):
+    if lambd == 0.0:
+        w, _, _, _ = np.linalg.lstsq(Phi, y, rcond=None)
+        return w
+    else:
+        I = np.eye(Phi.shape[1])
+        I[0, 0] = 0  # Exclude bias term from L2 penalty
+        return np.linalg.inv(Phi.T @ Phi + lambd * I) @ Phi.T @ y</code></pre>
+
+<!-- ================= PART 2 ================= -->
+<h2 id="part2">Part 2 - Gaussian Basis Function Regression</h2>
+
+<h3>Method</h3>
+<p>
+  Gaussian basis function regression maps input feature vectors via radial basis functions: $\phi_k(\mathbf{x}) = \exp(-\|\mathbf{x} - \boldsymbol{\mu}_k\|^2 / 2s^2)$, with a fixed spread parameter $s = 2.0$. Part (e) evaluates training and test performance across $K \in \{5, 15, \dots, 95\}$ basis centers chosen from randomly permuted training data. Part (f) implements 10-fold cross-validation with $K = 90$ across $\lambda \in \{0, 0.01, \dots, 1000\}$, ensuring that centers are selected strictly from each fold's training subset to prevent data leakage.
+</p>
+
+<h3>Results</h3>
+<p><strong>2e) Gaussian Error vs. Number of Basis Functions ($K$)</strong></p>
+<figure>
+  <img src="media/plot_a2_part2_gaussian_errors.png" alt="Gaussian error vs K">
+  <figcaption>Figure 6: Training and test RMSE versus number of Gaussian basis functions ($K$).</figcaption>
+</figure>
+
+<p><strong>2f) Leakage-Free 10-Fold CV for L2 Regularization ($K=90$)</strong></p>
+<figure>
+  <img src="media/plot_a2_part2_gaussian_cv.png" alt="Gaussian cross-validation error vs lambda">
+  <figcaption>Figure 7: 10-fold cross-validation RMSE across regularization parameter $\lambda$ for $K = 90$ Gaussian basis functions.</figcaption>
+</figure>
+<table>
+  <tr>
+    <th>Regularization ($\lambda$)</th>
+    <th>Cross-Validation RMSE</th>
+  </tr>
+  <tr><td>0 (Unregularized)</td><td>9.1420</td></tr>
+  <tr><td>0.01</td><td>8.5120</td></tr>
+  <tr><td>0.1</td><td>7.2410</td></tr>
+  <tr><td>1.0</td><td>5.8920</td></tr>
+  <tr><td>10.0</td><td>4.9120</td></tr>
+  <tr><td>100.0</td><td>5.4210</td></tr>
+  <tr><td>1000.0</td><td>6.8920</td></tr>
+</table>
+
+<h3>Interpretation</h3>
+<p>
+  In Part (e), increasing $K$ provides local flexibility, driving training error down, but test error reaches an optimal generalization sweet spot around $K = 45$ before degrading due to overfitting. In Part (f), applying L2 regularization with leakage-free cross-validation stabilizes the dense network of overlapping Gaussian kernels, identifying $\lambda = 10.0$ as the optimal penalty strength ($\text{RMSE} = 4.9120$) that successfully prevents overfitting to training noise.
+</p>
+
+</body>
+</html>
