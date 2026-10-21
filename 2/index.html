@@ -15,7 +15,7 @@
 <body>
 
 <h1>SYDE 572 - Assignment 2</h1>
-<p>Linear Regression using Polynomial and Gaussian basis functions on the Boston Housing dataset. Each section details the experimental methodology, quantitative error tables, learned model weights, validation outcomes, and analytical interpretations.</p>
+<p>Linear regression with polynomial and Gaussian basis functions on the Boston Housing dataset (predicting median house value, MEDV, in \$1000s). All numbers below come directly from running <code>a2part1.py</code> and <code>a2part2.py</code>.</p>
 
 <nav>
   <a href="../index.html">&larr; All assignments</a>
@@ -29,14 +29,14 @@
 
 <h3>Method</h3>
 <p>
-  We utilize the Boston Housing dataset, dividing it into the first 100 samples for training and the remaining samples for testing. All input feature dimensions are normalized to zero mean and unit variance based strictly on training set statistics. Polynomial basis functions are constructed independently across features up to degree $M$ without cross-terms ($x_i^d$). Ordinary Least Squares (OLS) closed-form weights are computed via $\mathbf{w} = (\mathbf{\Phi}^T\mathbf{\Phi})^{-1}\mathbf{\Phi}^T\mathbf{y}$, utilizing SVD pseudoinverse least-squares solvers to ensure numerical stability. For regularized experiments, 10-fold cross-validation is performed with per-fold feature normalization to completely eliminate data leakage.
+  The first 100 rows of the Boston Housing data are used for training and the remaining 406 for testing. Each of the 13 input features is standardized (zero mean, unit variance) using the mean and standard deviation of the 100 training rows only. CHAS (the Charles River dummy) is 0 for every training row, so its standard deviation is zero; I set it to 1 to avoid dividing by zero, which leaves that column as all zeros in training. The polynomial design matrix has a bias column plus $x_i, x_i^2, \dots, x_i^M$ for every feature $i$, with no cross-terms, giving $1 + 13M$ columns. Unregularized weights are the least-squares solution $\mathbf{w} = \mathbf{\Phi}^{+}\mathbf{y}$, computed with <code>np.linalg.lstsq</code> (an SVD pseudoinverse). That matters here because the all-zero CHAS columns make $\mathbf{\Phi}^T\mathbf{\Phi}$ singular. Regularized fits use $\mathbf{w} = (\mathbf{\Phi}^T\mathbf{\Phi} + \lambda \mathbf{I})^{-1}\mathbf{\Phi}^T\mathbf{y}$, without penalizing the bias. Errors are reported as RMS error in MEDV units (\$1000s).
 </p>
 
 <h3>Results</h3>
 <p><strong>1a) Polynomial Degrees 1 through 7</strong></p>
 <figure>
   <img src="media/plot_a2_part1_errors.png" alt="Training vs Test RMSE across polynomial degrees 1 to 7">
-  <figcaption>Figure 1: Training and test root mean squared error (RMSE) versus polynomial degree $M$ (displayed on a logarithmic y-axis).</figcaption>
+  <figcaption>Figure 1: Training and test RMS error versus polynomial degree $M$ (log y-axis, since the test error spans about 14 orders of magnitude).</figcaption>
 </figure>
 
 <table>
@@ -45,77 +45,99 @@
     <th>Training RMSE</th>
     <th>Test RMSE</th>
   </tr>
-  <tr><td>1</td><td>4.6852</td><td>6.2140</td></tr>
-  <tr><td>2</td><td>3.6214</td><td>5.1982</td></tr>
-  <tr><td>3</td><td>2.9412</td><td>4.8210</td></tr>
-  <tr><td>4</td><td>2.3104</td><td>5.1432</td></tr>
-  <tr><td>5</td><td>1.8543</td><td>6.8920</td></tr>
-  <tr><td>6</td><td>1.3120</td><td>45.2100</td></tr>
-  <tr><td>7</td><td>0.9821</td><td>$2.6143 \times 10^{15}$</td></tr>
+  <tr><td style="text-align: center;">1</td><td>2.0372</td><td>$3.64 \times 10^{1}$</td></tr>
+  <tr><td style="text-align: center;">2</td><td>1.5781</td><td>$1.10 \times 10^{3}$</td></tr>
+  <tr><td style="text-align: center;">3</td><td>1.4491</td><td>$4.87 \times 10^{4}$</td></tr>
+  <tr><td style="text-align: center;">4</td><td>1.2705</td><td>$2.19 \times 10^{7}$</td></tr>
+  <tr><td style="text-align: center;">5</td><td>1.0966</td><td>$1.84 \times 10^{10}$</td></tr>
+  <tr><td style="text-align: center;">6</td><td>1.0725</td><td>$5.02 \times 10^{12}$</td></tr>
+  <tr><td style="text-align: center;">7</td><td>0.8815</td><td>$6.88 \times 10^{15}$</td></tr>
 </table>
 
+<p>
+  <em>Comment:</em> Training error falls steadily with degree (2.04 &rarr; 0.88), as expected when each degree adds 13 more parameters for the same 100 points. Test error is poor even at degree 1 (36.4, compared with 9.83 for simply predicting the training mean) and then grows by roughly two to three orders of magnitude per degree. The main cause is the split rather than the model. The dataset is ordered by town, so the first 100 rows are mostly low-crime suburbs. CRIM ranges from 0.006 to 1.6 in training but goes up to 89 in the test set, which is about 229 training standard deviations away. A linear term in CRIM is already badly wrong that far out, and $x^M$ makes it worse with every degree. NOX, RAD, TAX and B show the same kind of extrapolation to a lesser degree. So the plot shows overfitting (training error keeps dropping while test error rises) on top of severe extrapolation from a training set that isn't representative of the test set.
+</p>
+
 <p><strong>1b) Degree 1 Model Weight Inspection</strong></p>
-<p>Fitting a degree 1 linear model across all 13 features yields the following learned coefficients ($w_0$ as bias intercept, $w_i$ corresponding to feature index $i$):</p>
+<p>Weights from the degree 1 fit on all 13 standardized features ($w_0$ is the bias). Because the inputs are standardized, each $w_i$ is the change in predicted MEDV (\$1000s) for a one-standard-deviation increase in that feature, holding the others fixed.</p>
 <table>
   <tr>
     <th>Coefficient</th>
     <th>Feature Description</th>
     <th>Learned Weight Value</th>
   </tr>
-  <tr><td>$w_0$</td><td>Intercept (Bias)</td><td>22.4512</td></tr>
-  <tr><td>$w_1$</td><td>Per capita crime rate (CRIM)</td><td>-0.8142</td></tr>
-  <tr><td>$w_2$</td><td>Proportion of residential land zoned (ZN)</td><td>+1.1204</td></tr>
-  <tr><td>$w_3$</td><td>Proportion of non-retail business acres (INDUS)</td><td>+0.1542</td></tr>
-  <tr><td>$w_4$</td><td>Charles River dummy variable (CHAS)</td><td>+0.6890</td></tr>
-  <tr><td>$w_5$</td><td>Nitric oxides concentration (NOX)</td><td>-1.8921</td></tr>
-  <tr><td>$w_6$</td><td>Average rooms per dwelling (RM)</td><td>+3.4210</td></tr>
-  <tr><td>$w_7$</td><td>Proportion of owner-occupied units built prior to 1940 (AGE)</td><td>-0.1042</td></tr>
-  <tr><td>$w_8$</td><td>Weighted distances to employment centres (DIS)</td><td>-1.5890</td></tr>
-  <tr><td>$w_9$</td><td>Index of accessibility to radial highways (RAD)</td><td>+2.1043</td></tr>
-  <tr><td>$w_{10}$</td><td>Full-value property-tax rate (TAX)</td><td>-1.4520</td></tr>
-  <tr><td>$w_{11}$</td><td>Pupil-teacher ratio (PTRATIO)</td><td>-2.0142</td></tr>
-  <tr><td>$w_{12}$</td><td>$1000(\text{Bk} - 0.63)^2$ (B)</td><td>+0.8412</td></tr>
-  <tr><td>$w_{13}$</td><td>Percentage lower status of the population (LSTAT)</td><td>-3.6912</td></tr>
+  <tr><td>$w_0$</td><td>Bias (intercept)</td><td>22.3090</td></tr>
+  <tr><td>$w_1$</td><td>Per capita crime rate (CRIM)</td><td>-1.3380</td></tr>
+  <tr><td>$w_2$</td><td>Proportion of residential land zoned for lots over 25,000 sq.ft. (ZN)</td><td>+0.1230</td></tr>
+  <tr><td>$w_3$</td><td>Proportion of non-retail business acres (INDUS)</td><td>-0.5311</td></tr>
+  <tr><td>$w_4$</td><td>Charles River dummy variable (CHAS)</td><td>0.0000</td></tr>
+  <tr><td>$w_5$</td><td>Nitric oxides concentration (NOX)</td><td>+1.0027</td></tr>
+  <tr><td><strong>$w_6$</strong></td><td><strong>Average rooms per dwelling (RM), 6th feature</strong></td><td><strong>+4.1956</strong></td></tr>
+  <tr><td>$w_7$</td><td>Proportion of owner-occupied units built prior to 1940 (AGE)</td><td>-2.1663</td></tr>
+  <tr><td><strong>$w_8$</strong></td><td><strong>Weighted distance to five Boston employment centres (DIS), 8th feature</strong></td><td><strong>+0.0107</strong></td></tr>
+  <tr><td>$w_9$</td><td>Index of accessibility to radial highways (RAD)</td><td>-0.1938</td></tr>
+  <tr><td>$w_{10}$</td><td>Full-value property-tax rate (TAX)</td><td>-0.3486</td></tr>
+  <tr><td>$w_{11}$</td><td>Pupil-teacher ratio (PTRATIO)</td><td>+0.2613</td></tr>
+  <tr><td>$w_{12}$</td><td>$1000(\text{Bk} - 0.63)^2$ (B)</td><td>+0.1811</td></tr>
+  <tr><td>$w_{13}$</td><td>Percentage lower status of the population (LSTAT)</td><td>+0.1488</td></tr>
 </table>
+<p>
+  The bias is listed as $w_0$, so the weight the assignment calls "$w_5$" (the 6th feature, RM) is $w_6$ in this table. CHAS gets exactly 0 because it never varies in the training set.
+</p>
+<p>
+  <em>RM (6th feature), $w_6 = +4.20$:</em> This one looks reasonable. More rooms means bigger houses, so the value should go up, and RM is by far the strongest predictor in the training rows (its correlation with MEDV there is 0.85). In raw units, one training standard deviation of RM is about 0.49 rooms, so the model adds roughly \$8,600 per extra room. That's the right sign and a plausible size, though it's about double the roughly \$3,800 per room you get when fitting all 506 rows.
+</p>
+<p>
+  <em>DIS (8th feature), $w_8 = +0.011$:</em> This one is harder to trust. It's essentially zero: moving one standard deviation further away (about 1.4 units of weighted distance) changes the prediction by under \$11. Intuitively, being farther from employment centres should lower prices once everything else is held fixed. A regression on the full dataset agrees: it gives DIS a clearly negative weight (about &minus;1.5 per unit). With only 100 fairly similar suburban towns, DIS is correlated with NOX (&minus;0.48), INDUS and AGE, so whatever information it carries gets absorbed by those features and its own weight ends up near zero. The sign and size aren't meaningful here. In general, individual weights from a small regression with correlated features shouldn't be read as "the effect" of that feature. The same issue shows up in NOX (+1.00) and PTRATIO (+0.26), whose signs are the opposite of what you'd expect.
+</p>
 
 <p><strong>1c) 1D Polynomial Visualizations</strong></p>
+<p>Only feature 2, ZN (column 2 of the standardized matrix, <code>X[:, 1]</code> in Python), is used here, with the same training-set standardization. Training and test RMSE for the three fits shown:</p>
+<table>
+  <tr><th>Degree</th><th>Training RMSE</th><th>Test RMSE</th></tr>
+  <tr><td style="text-align: center;">1</td><td>5.695</td><td>9.352</td></tr>
+  <tr><td style="text-align: center;">4</td><td>5.651</td><td>9.390</td></tr>
+  <tr><td style="text-align: center;">8</td><td>5.477</td><td>18.645</td></tr>
+</table>
 <div class="gallery">
   <figure>
     <img src="media/plot_part1c_Degree_1_Underfitting.png" alt="Degree 1 fit">
-    <figcaption>Figure 2: Degree 1 fit (underfitting linear model).</figcaption>
+    <figcaption>Figure 2: Degree 1. A gentle upward trend: towns with more large-lot zoning are slightly more expensive. It underfits, but ZN on its own doesn't explain much of the variation anyway.</figcaption>
   </figure>
   <figure>
     <img src="media/plot_part1c_Degree_4_Moderate.png" alt="Degree 4 fit">
-    <figcaption>Figure 3: Degree 4 fit (balanced flexibility capturing curve trends).</figcaption>
+    <figcaption>Figure 3: Degree 4. Adds a bit of curvature but improves training error only slightly (5.70 &rarr; 5.65), and test error is essentially unchanged (9.39). The extra flexibility isn't buying anything.</figcaption>
   </figure>
   <figure>
     <img src="media/plot_part1c_Degree_8_Overfitting.png" alt="Degree 8 fit">
-    <figcaption>Figure 4: Degree 8 fit (extreme oscillations and overfitting).</figcaption>
+    <figcaption>Figure 4: Degree 8. Clear overfitting. ZN takes only 12 distinct values in the training set, so the curve threads between those vertical clusters and swings far off the chart in the gaps (e.g. between about 1 and 2.5, where there is no training data at all). Test error doubles to 18.6.</figcaption>
   </figure>
 </div>
+<p>
+  <em>Comment:</em> Most training points (63 of the 100) sit at ZN = 0, which is about &minus;0.5 after normalizing, and their MEDV ranges from about 13 to 44. Since they all share the same x value, no curve in ZN can fit them well, and training error stays around 5.5 at every degree. Low-degree fits capture the weak upward trend. The high-degree fit chases the handful of distinct ZN values and becomes wildly wrong between them, which is exactly where many of the test points fall.
+</p>
 
 <p><strong>1d) L2 Regularization & 10-Fold Cross-Validation</strong></p>
+<p>Degree 8 polynomial on feature 2 (ZN) using the first 100 points, split into ten contiguous folds of 10. For each fold, the standardization statistics are recomputed from the 90 training points so the held-out fold never influences the fit. Reported values are the average validation RMSE over the 10 folds.</p>
 <figure>
   <img src="media/plot_a2_part1_cv.png" alt="Polynomial cross-validation error vs lambda">
-  <figcaption>Figure 5: 10-fold cross-validation RMSE across regularization parameter $\lambda$ for an 8th-degree polynomial.</figcaption>
+  <figcaption>Figure 5: Average 10-fold validation RMSE versus $\lambda$ for the degree 8 polynomial (semilogx; y-axis also on a log scale so the curve isn't flattened by the $\lambda = 0$ baseline, shown as the dashed line).</figcaption>
 </figure>
 <table>
   <tr>
     <th>Regularization ($\lambda$)</th>
-    <th>Cross-Validation RMSE</th>
+    <th>Average Validation RMSE</th>
   </tr>
-  <tr><td>0 (Unregularized)</td><td>8.4120</td></tr>
-  <tr><td>0.01</td><td>7.9120</td></tr>
-  <tr><td>0.1</td><td>6.8420</td></tr>
-  <tr><td>1.0</td><td>5.1240</td></tr>
-  <tr><td>10.0</td><td>5.4810</td></tr>
-  <tr><td>100.0</td><td>6.3210</td></tr>
-  <tr><td>1000.0</td><td>7.1040</td></tr>
+  <tr><td>0 (unregularized)</td><td>177,529.87</td></tr>
+  <tr><td>0.01</td><td>903.84</td></tr>
+  <tr><td>0.1</td><td>109.67</td></tr>
+  <tr><td>1</td><td>70.02</td></tr>
+  <tr><td><strong>10</strong></td><td><strong>9.98</strong></td></tr>
+  <tr><td>100</td><td>12.45</td></tr>
+  <tr><td>1000</td><td>17.79</td></tr>
 </table>
-
-<h3>Interpretation</h3>
 <p>
-  In Part (a), training error monotonically decreases as model capacity grows, whereas test error achieves its optimum at degree 3 ($\text{RMSE} = 4.8210$) before exploding to $2.6 \times 10^{15}$ at degree 7. This extreme divergence is caused by severe matrix ill-conditioning (near-linear dependencies among high-order power terms) combined with overfitting on the small 100-sample training set. In Part (b), the weights for rooms ($w_6 = +3.4210$) and employment distance ($w_8 = -1.5890$) align perfectly with economic intuition—more rooms increase property value, while greater distance to employment lowers it. In Part (d), 10-fold cross-validation identifies $\lambda = 1.0$ as the optimal regularization parameter, effectively penalizing coefficient magnitude and suppressing high-degree polynomial oscillations.
+  <em>Choice:</em> I would pick <strong>$\lambda = 10$</strong>, which has the lowest average validation error (9.98). Without regularization, the degree 8 curve explodes on held-out folds whose ZN values sit outside or between the values seen in training (the same behaviour as Figure 4), giving an average error around $1.8 \times 10^5$. Increasing $\lambda$ shrinks the high-order coefficients and tames those swings, so the error falls by four orders of magnitude up to $\lambda = 10$. Past that point the penalty starts flattening the curve toward a constant, and the model underfits (12.5 at $\lambda = 100$, 17.8 at $\lambda = 1000$). Even at the best $\lambda$, a single feature like ZN only gets you to roughly 10 RMSE.
 </p>
 
 <h3>Code</h3>
@@ -124,6 +146,7 @@
   <a href="https://github.com/victoriachakma/VC572/blob/main/2/a2part1.py" target="_blank" rel="noopener noreferrer">a2part1.py on GitHub &#8599;</a> |
   <a href="https://github.com/victoriachakma/VC572/blob/main/2/a2part2.py" target="_blank" rel="noopener noreferrer">a2part2.py on GitHub &#8599;</a>
 </p>
+<p>Each part of the assignment has its own function: <code>polynomial_regression</code> (a), <code>inspect_degree1_weights</code> (b), <code>polynomial_regression_1d_vis</code> (c) and <code>polynomial_regression_reg</code> (d) in <code>a2part1.py</code>; <code>gaussian_regression</code> (e) and <code>gaussian_regression_reg</code> (f) in <code>a2part2.py</code>. All of them share the least-squares solver below:</p>
 <pre><code>def train_linear_regression(Phi, y, lambd=0.0):
     if lambd == 0.0:
         w, _, _, _ = np.linalg.lstsq(Phi, y, rcond=None)
@@ -138,38 +161,55 @@
 
 <h3>Method</h3>
 <p>
-  Gaussian basis function regression maps input feature vectors via radial basis functions: $\phi_k(\mathbf{x}) = \exp(-\|\mathbf{x} - \boldsymbol{\mu}_k\|^2 / 2s^2)$, with a fixed spread parameter $s = 2.0$. Part (e) evaluates training and test performance across $K \in \{5, 15, \dots, 95\}$ basis centers chosen from randomly permuted training data. Part (f) implements 10-fold cross-validation with $K = 90$ across $\lambda \in \{0, 0.01, \dots, 1000\}$, ensuring that centers are selected strictly from each fold's training subset to prevent data leakage.
+  All 13 standardized features are used (same training-set standardization as Part 1). Each basis function is $\phi_j(\mathbf{x}) = \exp\!\left(-\|\mathbf{x} - \boldsymbol{\mu}_j\|^2 / 2s^2\right)$ with $s = 2$, plus a bias column. The centres $\boldsymbol{\mu}_j$ are training points: I generate one random permutation of the 100 training points (seed 42) and take the first $K$ as centres. Because the same permutation is reused, the centres for each larger $K$ include all the centres from the smaller ones. For part (f), the centres in each fold are drawn only from that fold's 90 training points. Since $K = 90$, every training point in the fold ends up as a centre.
 </p>
 
 <h3>Results</h3>
 <p><strong>2e) Gaussian Error vs. Number of Basis Functions ($K$)</strong></p>
 <figure>
   <img src="media/plot_a2_part2_gaussian_errors.png" alt="Gaussian error vs K">
-  <figcaption>Figure 6: Training and test RMSE versus number of Gaussian basis functions ($K$).</figcaption>
+  <figcaption>Figure 6: Training and test RMS error versus number of Gaussian basis functions $K$ ($s = 2$, no regularization).</figcaption>
 </figure>
+<table>
+  <tr><th>$K$</th><th>Training RMSE</th><th>Test RMSE</th></tr>
+  <tr><td style="text-align: center;">5</td><td>5.1909</td><td>9.7536</td></tr>
+  <tr><td style="text-align: center;">15</td><td>3.3618</td><td>9.4087</td></tr>
+  <tr><td style="text-align: center;">25</td><td>2.6586</td><td>9.1018</td></tr>
+  <tr><td style="text-align: center;">35</td><td>2.4985</td><td><strong>9.0072</strong></td></tr>
+  <tr><td style="text-align: center;">45</td><td>2.0470</td><td>9.0854</td></tr>
+  <tr><td style="text-align: center;">55</td><td>1.7276</td><td>9.4468</td></tr>
+  <tr><td style="text-align: center;">65</td><td>1.2135</td><td>9.3637</td></tr>
+  <tr><td style="text-align: center;">75</td><td>0.6983</td><td>9.3036</td></tr>
+  <tr><td style="text-align: center;">85</td><td>0.4227</td><td>13.0281</td></tr>
+  <tr><td style="text-align: center;">95</td><td>0.1782</td><td>43.0641</td></tr>
+</table>
+<p>
+  <em>Comment:</em> Training error drops steadily as $K$ grows (5.19 &rarr; 0.18). At $K = 95$ there are 96 parameters for 100 points, so the model is close to interpolating the training data. Test error barely moves between $K = 5$ and $K = 75$: it stays around 9.0&ndash;9.8, with a shallow minimum of 9.01 at $K = 35$. Then it jumps to 13.0 at $K = 85$ and 43.1 at $K = 95$, which is classic overfitting once the parameter count approaches the number of training points. Unlike the polynomial model, the Gaussian model doesn't blow up to astronomical values on the shifted test rows. A test point far from every centre (for example a high-crime town) has all $\phi_j \approx 0$, so the prediction just falls back to the bias. That's why the test error sits near the 9.83 you get from predicting the training mean: the bounded basis protects against extrapolation, but it also means the model has little to say about towns that look nothing like the training set.
+</p>
 
-<p><strong>2f) Leakage-Free 10-Fold CV for L2 Regularization ($K=90$)</strong></p>
+<p><strong>2f) L2 Regularization & 10-Fold Cross-Validation ($K=90$)</strong></p>
 <figure>
   <img src="media/plot_a2_part2_gaussian_cv.png" alt="Gaussian cross-validation error vs lambda">
-  <figcaption>Figure 7: 10-fold cross-validation RMSE across regularization parameter $\lambda$ for $K = 90$ Gaussian basis functions.</figcaption>
+  <figcaption>Figure 7: Average 10-fold validation RMSE versus $\lambda$ for $K = 90$ Gaussian basis functions (semilogx; dashed line is the $\lambda = 0$ baseline).</figcaption>
 </figure>
 <table>
   <tr>
     <th>Regularization ($\lambda$)</th>
-    <th>Cross-Validation RMSE</th>
+    <th>Average Validation RMSE</th>
   </tr>
-  <tr><td>0 (Unregularized)</td><td>9.1420</td></tr>
-  <tr><td>0.01</td><td>8.5120</td></tr>
-  <tr><td>0.1</td><td>7.2410</td></tr>
-  <tr><td>1.0</td><td>5.8920</td></tr>
-  <tr><td>10.0</td><td>4.9120</td></tr>
-  <tr><td>100.0</td><td>5.4210</td></tr>
-  <tr><td>1000.0</td><td>6.8920</td></tr>
+  <tr><td>0 (unregularized)</td><td>8.6771</td></tr>
+  <tr><td><strong>0.01</strong></td><td><strong>3.1080</strong></td></tr>
+  <tr><td>0.1</td><td>3.3284</td></tr>
+  <tr><td>1</td><td>3.4710</td></tr>
+  <tr><td>10</td><td>3.9966</td></tr>
+  <tr><td>100</td><td>4.8701</td></tr>
+  <tr><td>1000</td><td>5.5343</td></tr>
 </table>
-
-<h3>Interpretation</h3>
 <p>
-  In Part (e), increasing $K$ provides local flexibility, driving training error down, but test error reaches an optimal generalization sweet spot around $K = 45$ before degrading due to overfitting. In Part (f), applying L2 regularization with leakage-free cross-validation stabilizes the dense network of overlapping Gaussian kernels, identifying $\lambda = 10.0$ as the optimal penalty strength ($\text{RMSE} = 4.9120$) that successfully prevents overfitting to training noise.
+  <em>Choice:</em> I would pick <strong>$\lambda = 0.01$</strong>, the smallest value tested, which gives the lowest validation error (3.11). With $\lambda = 0$, there are 91 parameters for the 90 training points in each fold, so the model can fit them exactly, memorizes them, and does poorly on the held-out 10 (8.68). Even a small penalty is enough to stop that, cutting the error by almost two thirds. After that, error rises steadily with $\lambda$ because the weights are shrunk too far and the model underfits (5.53 at $\lambda = 1000$). Since the best value sits at the edge of the grid, a smaller $\lambda$ (e.g. 0.001) might do slightly better, but it wasn't part of the required set.
+</p>
+<p>
+  One thing worth noting: these validation errors (around 3) are much lower than the test errors in part (e) (around 9). Cross-validation here only ever holds out towns from the first 100 rows, which resemble each other, while the real test set contains very different towns. So CV is good for choosing $\lambda$, but it overestimates how well the model will do on the actual test set.
 </p>
 
 </body>
