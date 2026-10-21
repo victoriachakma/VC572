@@ -15,8 +15,10 @@ def load_boston_data():
     try:
         data_url = "https://lib.stat.cmu.edu/datasets/boston"
         raw_df = pd.read_csv(data_url, sep=r"\s+", skiprows=22, header=None)
-        data = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
-        return data[:, :-1], data[:, -1]
+        # each town spans two lines: 11 features, then B, LSTAT and MEDV (the target)
+        X = np.hstack([raw_df.values[::2, :], raw_df.values[1::2, :2]])
+        y = raw_df.values[1::2, 2]
+        return X, y
     except Exception:
         from sklearn.datasets import fetch_openml
         boston = fetch_openml(name='boston', version=1, as_frame=False)
